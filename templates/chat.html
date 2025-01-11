@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat App with Audio and Photo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container my-5">
+        <div class="row">
+            <!-- Online Users Section -->
+            <div class="col-md-4 mb-3">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="card-title text-center">Online Users</h4>
+                    </div>
+                    <div id="users" class="card-body p-3" style="height: 300px; overflow-y: auto;"></div>
+                </div>
+            </div>
+            <!-- Chat Section -->
+            <div class="col-md-8">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="card-title text-center">Chat Room</h4>
+                    </div>
+                    <div class="card-body">
+                        <div id="messages" class="mb-3 p-3 border rounded" style="height: 300px; overflow-y: auto;"></div>
+                        
+                        <!-- Photo Upload -->
+                        <form id="photo-upload" class="d-flex mb-3" enctype="multipart/form-data">
+                            <input type="file" id="photo" class="form-control me-2" accept="image/*">
+                            <button class="btn btn-warning">Upload Photo</button>
+                        </form>
+
+                        <!-- Audio Controls -->
+                        <div class="mb-3">
+                            <button id="start-recording" class="btn btn-success me-2">Start Recording</button>
+                            <button id="stop-recording" class="btn btn-danger" disabled>Stop Recording</button>
+                        </div>
+                        
+                        <!-- Text Message -->
+                        <form id="input" class="d-flex">
+                            <input type="text" id="message" class="form-control me-2" placeholder="Type a message..." autocomplete="off">
+                            <button class="btn btn-primary">Send</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        const messagesDiv = document.getElementById('messages');
+        const form = document.getElementById('input');
+        const messageInput = document.getElementById('message');
+        const usersDiv = document.getElementById('users');
+        const photoUploadForm = document.getElementById('photo-upload');
+        const photoInput = document.getElementById('photo');
+        const startRecordingBtn = document.getElementById('start-recording');
+        const stopRecordingBtn = document.getElementById('stop-recording');
+
+        let mediaRecorder;
+        let audioChunks = [];
+
+        const username = prompt("Enter your username:");
+        const room = "main";
+        socket.emit('join', { username, room });
+
+        // Update Online Users
+        socket.on('update_users', (users) => {
+            usersDiv.innerHTML = '';
+            users.forEach(user => {
+                const userDiv = document.createElement('div');
+                userDiv.textContent = user;
+                userDiv.classList.add('p-2', 'text-primary', 'border-bottom');
+                usersDiv.appendChild(userDiv);
+            });
+        });
+
+        // Display Messages
+        socket.on('message', (data) => {
+            const msgDiv = document.createElement('div');
+            msgDiv.innerHTML = `<strong>${data.username}:</strong> ${data.message}`;
+            messagesDiv.appendChild(msgDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        });
+
+        // Display Audio Messages
+        socket.on('audio', (data) => {
+            const audioDiv = document.createElement('div');
+            audioDiv.innerHTML = `<strong>${data.username}:</strong><br><audio controls src="${data.audio_url}" class="mt-2"></audio>`;
+            messagesDiv.appendChild(audioDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        });
+
+        // Display Photo Messages
+        socket.on('photo', (data) => {
+            const photoDiv = document.createElement('div');
+            photoDiv.innerHTML = `<strong>${data.username}:</strong><br><img src="${data.photo_url}" alt="Photo" class="img-fluid mt-2" style="max-width: 200px;">`;
+            messagesDiv.appendChild(photoDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        });
+
+        // Send Message
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const message = messageInput.value;
+            if (message.trim() !== "") {
+                socket.emit('message', { username, message, room });
+                messageInput.value = '';
+            }
+        });
+
+        // Upload Photo
+        photoUploadForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const file = photoInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    socket.emit('upload_photo', { username, room, photo: reader.result, filename: `photo_${Date.now()}_${file.name}` });
+                };
+                reader.readAsArrayBuffer(file);
+                photoInput.value = '';
+            }
+        });
+
+        // Start Recording
+        startRecordingBtn.addEventListener('click', async () => {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.ondataavailable = (event) => {
+                audioChunks.push(event.data);
+            };
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                audioChunks = [];
+                const reader = new FileReader();
+                reader.onload = () => {
+                    socket.emit('upload_audio', { username, room, audio: reader.result, filename: `audio_${Date.now()}.webm` });
+                };
+                reader.readAsArrayBuffer(audioBlob);
+            };
+            mediaRecorder.start();
+            startRecordingBtn.disabled = true;
+            stopRecordingBtn.disabled = false;
+        });
+
+        // Stop Recording
+        stopRecordingBtn.addEventListener('click', () => {
+            mediaRecorder.stop();
+            startRecordingBtn.disabled = false;
+            stopRecordingBtn.disabled = true;
+        });
+
+        // Leave Room
+        window.addEventListener('beforeunload', () => {
+            socket.emit('leave', { username, room });
+        });
+    </script>
+</body>
+</html>

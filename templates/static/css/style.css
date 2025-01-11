@@ -1,0 +1,62 @@
+body {
+    font-family: 'Arial', sans-serif;
+}
+
+.card {
+    border-radius: 15px;
+}
+
+#messages {
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+}
+
+#messages div {
+    margin-bottom: 10px;
+    padding: 5px;
+}
+
+#messages div strong {
+    color: #007bff;
+}
+
+/* Light Mode */
+body.bg-light {
+    background-color: #f8f9fa;
+    color: #212529;
+}
+
+#messages {
+    background-color: #ffffff;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+}
+
+#messages div {
+    margin-bottom: 10px;
+    padding: 5px;
+}
+
+#messages div strong {
+    color: #007bff;
+}
+
+/* Dark Mode */
+body.bg-dark {
+    background-color: #212529;
+    color: #f8f9fa;
+}
+
+#messages.bg-dark {
+    background-color: #343a40;
+    border: 1px solid #454d55;
+}
+
+#messages.bg-dark div strong {
+    color: #80bdff;
+}
+
+.card-header.bg-primary {
+    color: white;
+}
